@@ -16,18 +16,14 @@ import (
 const sheetSummaryName = "Summary"
 
 type XlFile struct {
-	fileName     string
-	file         *excelize.File
-	serviceIdMap map[string]domain.ServiceId
-	projectIdMap map[string]domain.ProjectId
+	fileName string
+	file     *excelize.File
 }
 
 func ExcelFile(fileName string) *XlFile {
 	return &XlFile{
 		fileName,
 		excelize.NewFile(),
-		make(map[string]domain.ServiceId),
-		make(map[string]domain.ProjectId),
 	}
 }
 
@@ -47,8 +43,6 @@ func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 		log.Debugf("Loading entry %s", entry.Id)
 
 		entryMonth := fmt.Sprintf("%s %d", entry.Date.Month(), entry.Date.Year())
-		xlx.serviceIdMap[entry.ServiceName] = entry.ServiceId
-		xlx.projectIdMap[entry.ProjectName] = entry.ProjectId
 
 		xlx.file.NewSheet(entryMonth)
 		currentRow := monthEntriesCounts[entryMonth]
@@ -65,8 +59,8 @@ func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 
 		xlx.WriteEntry(entry.Id.String(), entryMonth, currentRow, []string{
 			entry.Date.String(),
-			fmt.Sprintf("%s / %d", entry.ProjectName, entry.ProjectId),
-			fmt.Sprintf("%s / %d", entry.ServiceName, entry.ServiceId),
+			fmt.Sprintf("%s", entry.ProjectName),
+			fmt.Sprintf("%s", entry.ServiceName),
 			strconv.FormatBool(entry.Billable),
 			entry.Minutes.String(), entry.Note,
 		})
@@ -237,6 +231,9 @@ func (xlx *XlFile) SaveToDisk() error {
 func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 	log.Debugf("Reading all entries from %s sheet", sheetName)
 
+	pmap := xlx.readProjectId()
+	smap := xlx.readServiceId()
+
 	rows, err := xlx.file.GetRows(sheetName)
 	if err != nil {
 		log.Fatal(err)
@@ -269,19 +266,20 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 					}
 				case "B":
 
-					project := strings.SplitN(cellData, "/", 2)
-					projectId, err = domain.ParseProjectId(strings.TrimSpace(project[1]))
-
-					if err != nil {
-						log.Fatal(err)
+					id, ok := pmap[strings.ToLower(cellData)]
+					if !ok {
+						log.Errorf("Unable to look id for project %s ", cellData)
 					}
+					projectId = id
 				case "C":
-					service := strings.SplitN(cellData, "/", 2)
-					serviceId, err = domain.ParseServiceId(strings.TrimSpace(service[1]))
 
-					if err != nil {
-						log.Fatal(err)
+					id, ok := smap[strings.ToLower(cellData)]
+
+					if !ok {
+						log.Errorf("Unable to look id for service %s ", cellData)
 					}
+					serviceId = id
+
 				case "D":
 					isEntryBillable, err = strconv.ParseBool(cellData)
 					if err != nil {
@@ -322,6 +320,142 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 	return timeEntries
 }
 
+func (xlx *XlFile) saveServiceId(serviceIdMap map[string]domain.ServiceId) error {
+
+	log.Debug("Writing ServiceIds...")
+
+	sheetName := "ServiceIds"
+	xlx.file.NewSheet(sheetName)
+	err := xlx.file.SetSheetVisible(sheetName, false)
+
+	if err != nil {
+		return err
+	}
+	row := 1
+	xlx.WriteHeader(sheetName, row, []string{"serviceId", "serviceName"})
+	row++
+	for name, id := range serviceIdMap {
+		xlx.writeCellData(sheetName, fmt.Sprintf("A%d", row), name)
+		xlx.writeCellData(sheetName, fmt.Sprintf("B%d", row), id.String())
+		row++
+	}
+
+	return nil
+}
+
+func (xlx *XlFile) readServiceId() map[string]domain.ServiceId {
+	log.Debug("Reading ServiceIds...")
+	sheetName := "ServiceIds"
+	serviceIdMap := make(map[string]domain.ServiceId)
+
+	rows, err := xlx.file.GetRows(sheetName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for rIx, row := range rows {
+		// skip header
+		if rIx > 0 {
+			var serviceName string
+			var serviceId domain.ServiceId
+			for cIx, cellData := range row {
+
+				cellNr := cIx + 1
+				colName, err := excelize.ColumnNumberToName(cellNr)
+
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				switch colName {
+				case "A":
+					serviceName = cellData
+				case "B":
+
+					id, err := strconv.Atoi(cellData)
+					if err != nil {
+						log.Fatal(err)
+					}
+					serviceId = domain.NewServiceId(id)
+
+				}
+
+			}
+			serviceIdMap[strings.ToLower(serviceName)] = serviceId
+			log.Debugf("found %s=%s", serviceName, serviceId)
+
+		}
+
+	}
+	return serviceIdMap
+}
+
+func (xlx *XlFile) saveProjectId(projectIdMap map[string]domain.ProjectId) error {
+	log.Debug("Writing ProjecId...")
+
+	sheetName := "ProjectIds"
+	xlx.file.NewSheet(sheetName)
+	err := xlx.file.SetSheetVisible(sheetName, false)
+
+	if err != nil {
+		return err
+	}
+	row := 1
+	xlx.WriteHeader(sheetName, row, []string{"projectId", "projectName"})
+	row++
+	for name, id := range projectIdMap {
+		xlx.writeCellData(sheetName, fmt.Sprintf("A%d", row), name)
+		xlx.writeCellData(sheetName, fmt.Sprintf("B%d", row), id.String())
+		row++
+	}
+
+	return nil
+}
+func (xlx *XlFile) readProjectId() map[string]domain.ProjectId {
+	log.Debug("Reading ProjectIds...")
+	sheetName := "ProjectIds"
+	projectIdMap := make(map[string]domain.ProjectId)
+
+	rows, err := xlx.file.GetRows(sheetName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for rIx, row := range rows {
+		// skip header
+		if rIx > 0 {
+			var projectName string
+			var projectId domain.ProjectId
+
+			for cIx, cellData := range row {
+
+				cellNr := cIx + 1
+				colName, err := excelize.ColumnNumberToName(cellNr)
+
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				switch colName {
+				case "A":
+					projectName = cellData
+				case "B":
+
+					id, err := strconv.Atoi(cellData)
+					if err != nil {
+						log.Fatal(err)
+					}
+					projectId = domain.NewProjectId(id)
+
+				}
+
+			}
+			projectIdMap[strings.ToLower(projectName)] = projectId
+			log.Debugf("found %s=%s", projectName, projectId)
+		}
+
+	}
+	return projectIdMap
+}
+
 func (xlx *XlFile) ReadAllEntries(date domain.LocalDate) []domain.TimeEntry {
 	return xlx.ReadAllEntriesBySheet(fmt.Sprintf("%s %d", date.Month(), date.Year()))
 }
@@ -335,4 +469,22 @@ func (xlx *XlFile) GetSheets() {
 func (xlx *XlFile) SaveAllEntries(entries []*domain.TimeEntry) error {
 	xlx.LoadAllEntries(entries)
 	return xlx.SaveToDisk()
+}
+
+func (xlx *XlFile) SaveServiceProjects(sMap map[string]domain.ServiceId, pMap map[string]domain.ProjectId) {
+	err := xlx.saveServiceId(sMap)
+	if err != nil {
+		log.Fatal(err)
+
+	}
+	err = xlx.saveProjectId(pMap)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = xlx.SaveToDisk()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }

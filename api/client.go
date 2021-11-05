@@ -94,3 +94,28 @@ func (c *Client) SendEntriesToMite(entries []domain.TimeEntry) error {
 	}
 	return nil
 }
+
+func (c Client) FetchServiceProjects() (map[string]domain.ServiceId, map[string]domain.ProjectId, error) {
+	services, err := c.api.Services()
+	if err != nil {
+		return nil, nil, err
+	}
+	projects, err := c.api.Projects()
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	serviceIdMap := make(map[string]domain.ServiceId)
+
+	for _, s := range services {
+		serviceIdMap[s.Name] = s.Id
+	}
+	projectIdMap := make(map[string]domain.ProjectId)
+
+	for _, p := range projects {
+		projectIdMap[p.Name] = p.Id
+	}
+
+	return serviceIdMap, projectIdMap, nil
+}

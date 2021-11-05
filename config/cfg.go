@@ -149,5 +149,12 @@ func (cfg *MightyConfig) pullToFile(excelFilePath string) error {
 	if err != nil {
 		return err
 	}
+
+	pMap, sMap, err := cfg.client.FetchServiceProjects()
+	if err != nil {
+		return err
+	}
+
+	cfg.exportFile.SaveServiceProjects(pMap, sMap)
 	return nil
 }
