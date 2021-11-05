@@ -13,7 +13,9 @@ import (
 	"unicode/utf8"
 )
 
-const sheetSummaryName = "Summary"
+const (
+	sheetSummaryName = "Summary"
+)
 
 type XlFile struct {
 	fileName string
@@ -30,10 +32,12 @@ func ExcelFile(fileName string) *XlFile {
 func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 	log.Infof("Loading %d entries to %s", len(entries), xlx.fileName)
 
-	textStyle, err := xlx.file.NewStyle(`{"alignment":{"horizontal": "left","vertical": "center","wrap_text": true}}`)
+	entryNotesStyle, err := xlx.file.NewStyle(`{"alignment":{"horizontal": "left","vertical": "center","wrap_text": true}}`)
 	if err != nil {
 		fmt.Println(err)
 	}
+	entryDateFormat := "yyyy-mm-dd;@"
+	entryDateStyle, err := xlx.file.NewStyle(&excelize.Style{CustomNumFmt: &entryDateFormat})
 
 	var monthEntriesCounts map[string]int = make(map[string]int)
 	monthEntriesTotalHours := orderedmap.NewOrderedMap()
@@ -120,11 +124,21 @@ func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 			if err != nil {
 				log.Fatal(err)
 			}
-			err = xlx.file.SetColStyle(month, colName, textStyle)
+			err = xlx.file.SetColStyle(month, colName, entryNotesStyle)
 
 			if err != nil {
 				log.Fatal(err)
 			}
+
+			if colName == "A" {
+
+				err = xlx.file.SetColStyle(month, colName, entryDateStyle)
+
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+
 		}
 
 	}
