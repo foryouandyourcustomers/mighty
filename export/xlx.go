@@ -502,3 +502,7 @@ func (xlx *XlFile) SaveServiceProjects(sMap map[string]domain.ServiceId, pMap ma
 	}
 
 }
+
+func (xlx *XlFile) GenerateTemplate() {
+	// TODO: Add stuff here
+}

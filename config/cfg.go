@@ -2,22 +2,18 @@ package config
 
 import (
 	"fmt"
-	"github.com/leanovate/mite-go/domain"
-	"github.com/mitchellh/go-homedir"
 	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"mighty/api"
 	"mighty/export"
 )
 
 type MightyConfig struct {
-	MiteUrl        string `mapstructure:"url"`
-	Token          string `mapstructure:"token"`
-	EnableDebug    bool   `mapstructure:"debug"`
-	EntriesHistory string `mapstructure:"history"`
-	client         *api.Client
-	exportFile     *export.XlFile
-	viper          *viper.Viper
+	MiteUrl           string `mapstructure:"url"`
+	Token             string `mapstructure:"token"`
+	EnableDebug       bool   `mapstructure:"debug"`
+	EntriesHistory    string `mapstructure:"history"`
+	CurrentExportFile *export.XlFile
+	viper             *viper.Viper
 }
 
 const (
@@ -83,78 +79,8 @@ func SetupCfg(cfgFile string, generateCfg bool) {
 		logger.SetLevel(logger.WarnLevel)
 	}
 
-	CurrentConfig.client = createClientFromConfig()
 	CurrentConfig.viper = v
 	logger.Debugf("Using config file %s ", v.ConfigFileUsed())
 	logger.Infof("Config: %v", v.AllSettings())
 
-}
-
-func createClientFromConfig() *api.Client {
-	client, err := api.New(CurrentConfig.MiteUrl, CurrentConfig.Token)
-	if err != nil {
-		logger.Fatalf("Unable to create client %v", err)
-	}
-	return client
-}
-
-func (cfg *MightyConfig) SyncFile(excelFile string, onlyPull bool) error {
-	excelFilePath, err := homedir.Expand(excelFile)
-	if err != nil {
-		return err
-	}
-
-	if !onlyPull {
-		err = cfg.pushToFile(excelFilePath, domain.Today())
-		if err != nil {
-			return err
-		}
-	}
-
-	err = cfg.pullToFile(excelFilePath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (cfg *MightyConfig) pushToFile(excelFilePath string, date domain.LocalDate) error {
-
-	if cfg.exportFile == nil {
-		cfg.exportFile = export.ExcelFile(excelFilePath)
-	}
-
-	err := cfg.exportFile.ReloadFromDisk()
-	if err != nil {
-		return err
-	}
-
-	entries := cfg.exportFile.ReadAllEntries(date)
-	err = cfg.client.SendEntriesToMite(entries)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (cfg *MightyConfig) pullToFile(excelFilePath string) error {
-	if cfg.exportFile == nil {
-		cfg.exportFile = export.ExcelFile(excelFilePath)
-	}
-
-	allHistoricEntries, err := cfg.client.FetchEntries(cfg.EntriesHistory)
-	err = cfg.exportFile.SaveAllEntries(allHistoricEntries)
-	if err != nil {
-		return err
-	}
-
-	pMap, sMap, err := cfg.client.FetchServiceProjects()
-	if err != nil {
-		return err
-	}
-
-	cfg.exportFile.SaveServiceProjects(pMap, sMap)
-	return nil
 }

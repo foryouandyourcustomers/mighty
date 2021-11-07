@@ -29,6 +29,6 @@ var genCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(genCmd)
-	genCmd.Flags().Bool("configFile", false, "generates the empty config file (default is $HOME/.mighty.yaml)")
+	genCmd.Flags().Bool("configFile", false, "generates the empty config file")
 	genCmd.Flags().Bool("timesheetFile", false, "generates the excel sheet containing the timesheet entries")
 }
