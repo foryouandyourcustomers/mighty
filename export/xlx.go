@@ -5,7 +5,6 @@ import (
 	"github.com/elliotchance/orderedmap"
 	"github.com/leanovate/mite-go/domain"
 	log "github.com/sirupsen/logrus"
-	"github.com/xhit/go-str2duration/v2"
 	"github.com/xuri/excelize/v2"
 	"strconv"
 	"strings"
@@ -15,6 +14,11 @@ import (
 
 const (
 	sheetSummaryName = "Summary"
+)
+
+var (
+	entryDateFormat = "yyyy-mm-dd;@"
+	entryTimeFormat = "hh:mm:ss;@"
 )
 
 type XlFile struct {
@@ -36,8 +40,8 @@ func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	entryDateFormat := "yyyy-mm-dd;@"
 	entryDateStyle, err := xlx.file.NewStyle(&excelize.Style{CustomNumFmt: &entryDateFormat})
+	entryTimeStyle, err := xlx.file.NewStyle(&excelize.Style{CustomNumFmt: &entryTimeFormat})
 
 	var monthEntriesCounts map[string]int = make(map[string]int)
 	monthEntriesTotalHours := orderedmap.NewOrderedMap()
@@ -66,7 +70,8 @@ func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 			fmt.Sprintf("%s", entry.ProjectName),
 			fmt.Sprintf("%s", entry.ServiceName),
 			strconv.FormatBool(entry.Billable),
-			entry.Minutes.String(), entry.Note,
+			entryTime(entry.Minutes),
+			entry.Note,
 		})
 
 		// fit cell row height
@@ -89,7 +94,7 @@ func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 	// fit the cell width
 	log.Debug("Auto adjusting cell widths")
 
-	for month, _ := range monthEntriesCounts {
+	for month := range monthEntriesCounts {
 		cols, err := xlx.file.GetCols(month)
 
 		if err != nil {
@@ -133,6 +138,15 @@ func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 			if colName == "A" {
 
 				err = xlx.file.SetColStyle(month, colName, entryDateStyle)
+
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+
+			if colName == "E" {
+
+				err = xlx.file.SetColStyle(month, colName, entryTimeStyle)
 
 				if err != nil {
 					log.Fatal(err)
@@ -300,11 +314,12 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 						log.Fatal(err)
 					}
 				case "E":
-					duration, err := str2duration.ParseDuration(cellData)
-					if err != nil {
-						log.Fatal(err)
-					}
-					entryTime = domain.NewMinutes(int(duration.Minutes()))
+					//duration, err := str2duration.ParseDuration(cellData)
+					//if err != nil {
+					//	log.Fatal(err)
+					//}
+					//entryTime = domain.NewMinutes(int(duration.Minutes()))
+					entryTime = entryMinutes(cellData)
 				case "F":
 					entryNotes = cellData
 				case "G":
@@ -505,4 +520,44 @@ func (xlx *XlFile) SaveServiceProjects(sMap map[string]domain.ServiceId, pMap ma
 
 func (xlx *XlFile) GenerateTemplate() {
 	// TODO: Add stuff here
+}
+
+func entryTime(entryMins domain.Minutes) string {
+
+	if entryMins.Value() > 0 {
+		entryDuration, err := time.ParseDuration(entryMins.String())
+		if err != nil {
+			log.Fatal(err)
+		}
+		entryDuration = entryDuration.Round(time.Minute)
+		h := entryDuration / time.Hour
+		entryDuration -= h * time.Hour
+		m := entryDuration / time.Minute
+		return fmt.Sprintf("%02d:%02d:00", h, m)
+	}
+	return fmt.Sprint("00:00:00")
+
+}
+
+func entryMinutes(entryTime string) domain.Minutes {
+	var dur time.Duration
+	var err error
+
+	if len(entryTime) == 8 {
+		dur, err = time.ParseDuration(entryTime[0:2] + "h" + entryTime[3:5] + "m" + entryTime[6:8] + "s")
+	}
+
+	if len(entryTime) == 6 {
+		dur, err = time.ParseDuration(entryTime[0:2] + "h" + entryTime[3:5] + "m")
+	}
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	minutes, err := domain.ParseMinutes(dur.String())
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Debugf("parsing %s to duration %s to minutes %s ", entryTime, dur, minutes)
+	return minutes
 }
