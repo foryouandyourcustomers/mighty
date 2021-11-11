@@ -30,7 +30,7 @@ $ mighty sync mite-entries.xlsx
 `,
 		Run: func(cmd *cobra.Command, _ []string) {
 
-			initConfig()
+			config.ReadCfg()
 
 			file, err := cmd.Flags().GetString("timesheet")
 			if err != nil {

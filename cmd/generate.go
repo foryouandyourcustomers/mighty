@@ -1,34 +1,53 @@
 package cmd
 
 import (
-	"fmt"
+	"errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"mighty/config"
+	"os"
 )
 
 var genCmd = &cobra.Command{
 	Use:   "gen",
-	Short: "Generates required documents",
-	PreRun: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Generates the configuration or timesheet entries\n")
+	Short: "Generates templates for quick start",
+	Long: `Generates templates for quick start. 
+
+Supports generating the template and has the following options (case sensitive):
+
+* Configuration file:
+$ mighty gen config  # uses the default file path
+$ mighty gen config --configfile /path/to/file
+
+
+* timesheet file:
+$ mighty gen timesheet
+`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			err := cmd.Help()
+			if err != nil {
+				return err
+			}
+			os.Exit(0)
+		} else if len(args) != 1 {
+			return errors.New("Incorrect number of args.  Either use `config` or `timesheet` ")
+		}
+		return nil
 	},
-	Run: func(cmd *cobra.Command, _ []string) {
-
-		generateConfigFile, err := cmd.Flags().GetBool("configFile")
-		if err != nil {
-			log.Fatal("Unable to read config file")
-		}
-
-		if generateConfigFile {
+	Run: func(cmd *cobra.Command, args []string) {
+		op := args[0]
+		switch op {
+		case "config":
 			config.SetupCfg("", true)
+		default:
+			log.Errorf("Unsupported option %s", op)
+			_ = cmd.Help()
+			os.Exit(1)
 		}
-
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(genCmd)
-	genCmd.Flags().Bool("configFile", false, "generates the empty config file")
-	genCmd.Flags().Bool("timesheetFile", false, "generates the excel sheet containing the timesheet entries")
 }

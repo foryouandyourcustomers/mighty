@@ -26,9 +26,10 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().String("config", "$HOME/.mighty.yaml", "config file (default $HOME/.mighty.yaml)")
-	rootCmd.PersistentFlags().String("timesheet", "$HOME/entries.xlsx", "the file which stores the timesheet entries (default $HOME/entries.xlsx")
+	rootCmd.PersistentFlags().String("config", "", "config file (default $HOME/.mighty.yaml)")
+	rootCmd.PersistentFlags().String("timesheet", "", "the file which stores the timesheet entries (default $HOME/entries.xlsx")
 	log.SetOutput(os.Stdout)
+	cobra.OnInitialize(initConfig)
 }
 
 func initConfig() {

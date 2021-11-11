@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/elliotchance/orderedmap"
 	"github.com/leanovate/mite-go/domain"
 	"github.com/leanovate/mite-go/mite"
 	log "github.com/sirupsen/logrus"
@@ -36,11 +37,11 @@ func (c *Client) FetchEntries(duration string) ([]*domain.TimeEntry, error) {
 	log.Infof("Interpreting %s to fetching past entries from %s to %s ", duration, from.String(), to.String())
 
 	entries, err := c.api.TimeEntries(&domain.TimeEntryQuery{
-		UserId:    domain.CurrentUser,
-		From:      &from,
-		To:        &to,
-		Sort:      domain.SORT_BY_PROJECT,
-		Direction: domain.SORT_DIRECTION_ASC,
+		UserId: domain.CurrentUser,
+		From:   &from,
+		To:     &to,
+		//Sort:      domain.SORT_BY_PROJECT,
+		//Direction: domain.SORT_DIRECTION_DESC,
 	})
 
 	return entries, err
@@ -57,8 +58,6 @@ func (c *Client) SendEntriesToMite(entries []domain.TimeEntry) error {
 		}
 
 		if entry.Id == 0 {
-			log.Infof("Creating new entry [%v]", entry)
-
 			timeEntry, err := c.api.CreateTimeEntry(&domain.TimeEntryCommand{
 				Date:      &entry.Date,
 				Minutes:   &entry.Minutes,
@@ -71,31 +70,41 @@ func (c *Client) SendEntriesToMite(entries []domain.TimeEntry) error {
 			if err != nil {
 				return err
 			}
-
-			log.Infof("Created new entry [%v]", timeEntry)
+			log.Infof("Create %s| %s| %s| %s |%s ", entry.Date, entry.Minutes.String(), entry.ServiceName, entry.ProjectName, timeEntry.UpdatedAt)
 
 		} else {
-			log.Infof("Editing entry [%v]", entry)
 
-			err := c.api.EditTimeEntry(entry.Id, &domain.TimeEntryCommand{
-				Date:      &entry.Date,
-				Minutes:   &entry.Minutes,
-				Note:      entry.Note,
-				UserId:    domain.CurrentUser,
-				ProjectId: entry.ProjectId,
-				ServiceId: entry.ServiceId,
-				Locked:    false,
-			})
-			if err != nil {
-				return err
+			if entry.Minutes.Value() == 0 {
+				log.Infof("Delete %s| %s| %s| %s |%s ", entry.Date, entry.Minutes.String(), entry.ServiceName, entry.ProjectName, entry.UpdatedAt)
+
+				err := c.api.DeleteTimeEntry(entry.Id)
+				if err != nil {
+					return err
+				}
+			} else {
+				log.Infof("Edit %s| %s| %s| %s |%s ", entry.Date, entry.Minutes.String(), entry.ServiceName, entry.ProjectName, entry.UpdatedAt)
+
+				err := c.api.EditTimeEntry(entry.Id, &domain.TimeEntryCommand{
+					Date:      &entry.Date,
+					Minutes:   &entry.Minutes,
+					Note:      entry.Note,
+					UserId:    domain.CurrentUser,
+					ProjectId: entry.ProjectId,
+					ServiceId: entry.ServiceId,
+					Locked:    false,
+				})
+				if err != nil {
+					return err
+				}
 			}
+
 		}
 
 	}
 	return nil
 }
 
-func (c Client) FetchServiceProjects() (map[string]domain.ServiceId, map[string]domain.ProjectId, error) {
+func (c Client) FetchServiceProjects() (*orderedmap.OrderedMap, *orderedmap.OrderedMap, error) {
 	services, err := c.api.Services()
 	if err != nil {
 		return nil, nil, err
@@ -106,15 +115,15 @@ func (c Client) FetchServiceProjects() (map[string]domain.ServiceId, map[string]
 		return nil, nil, err
 	}
 
-	serviceIdMap := make(map[string]domain.ServiceId)
+	serviceIdMap := orderedmap.NewOrderedMap()
 
 	for _, s := range services {
-		serviceIdMap[s.Name] = s.Id
+		serviceIdMap.Set(s.Name, s.Id)
 	}
-	projectIdMap := make(map[string]domain.ProjectId)
+	projectIdMap := orderedmap.NewOrderedMap()
 
 	for _, p := range projects {
-		projectIdMap[p.Name] = p.Id
+		projectIdMap.Set(p.Name, p.Id)
 	}
 
 	return serviceIdMap, projectIdMap, nil

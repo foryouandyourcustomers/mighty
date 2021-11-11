@@ -19,6 +19,11 @@ const (
 var (
 	entryDateFormat = "yyyy-mm-dd;@"
 	entryTimeFormat = "hh:mm:ss;@"
+	entryAlignment  = &excelize.Alignment{
+		Horizontal: "left",
+		Vertical:   "center",
+		WrapText:   true,
+	}
 )
 
 type XlFile struct {
@@ -36,12 +41,12 @@ func ExcelFile(fileName string) *XlFile {
 func (xlx *XlFile) LoadAllEntries(entries []*domain.TimeEntry) {
 	log.Infof("Loading %d entries to %s", len(entries), xlx.fileName)
 
-	entryNotesStyle, err := xlx.file.NewStyle(`{"alignment":{"horizontal": "left","vertical": "center","wrap_text": true}}`)
+	entryNotesStyle, err := xlx.file.NewStyle(&excelize.Style{Alignment: entryAlignment})
 	if err != nil {
 		fmt.Println(err)
 	}
-	entryDateStyle, err := xlx.file.NewStyle(&excelize.Style{CustomNumFmt: &entryDateFormat})
-	entryTimeStyle, err := xlx.file.NewStyle(&excelize.Style{CustomNumFmt: &entryTimeFormat})
+	entryDateStyle, err := xlx.file.NewStyle(&excelize.Style{CustomNumFmt: &entryDateFormat, Alignment: entryAlignment})
+	entryTimeStyle, err := xlx.file.NewStyle(&excelize.Style{CustomNumFmt: &entryTimeFormat, Alignment: entryAlignment})
 
 	var monthEntriesCounts map[string]int = make(map[string]int)
 	monthEntriesTotalHours := orderedmap.NewOrderedMap()
@@ -253,6 +258,8 @@ func (xlx *XlFile) SaveToDisk() error {
 	log.Debug("Writing to disk ...")
 
 	xlx.file.SetActiveSheet(xlx.file.GetSheetIndex(sheetSummaryName))
+	// delete the default sheet
+	xlx.file.DeleteSheet("Sheet1")
 	return xlx.file.SaveAs(xlx.fileName)
 }
 
@@ -273,7 +280,9 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 			var entryDate domain.LocalDate
 			var entryTime domain.Minutes
 			var serviceId domain.ServiceId
+			var serviceName string
 			var projectId domain.ProjectId
+			var projectName string
 			var isEntryBillable bool
 			var entryNotes string
 			var entryId domain.TimeEntryId
@@ -299,6 +308,7 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 						log.Errorf("Unable to look id for project %s ", cellData)
 					}
 					projectId = id
+					projectName = cellData
 				case "C":
 
 					id, ok := smap[strings.ToLower(cellData)]
@@ -307,6 +317,7 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 						log.Errorf("Unable to look id for service %s ", cellData)
 					}
 					serviceId = id
+					serviceName = cellData
 
 				case "D":
 					isEntryBillable, err = strconv.ParseBool(cellData)
@@ -314,11 +325,6 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 						log.Fatal(err)
 					}
 				case "E":
-					//duration, err := str2duration.ParseDuration(cellData)
-					//if err != nil {
-					//	log.Fatal(err)
-					//}
-					//entryTime = domain.NewMinutes(int(duration.Minutes()))
 					entryTime = entryMinutes(cellData)
 				case "F":
 					entryNotes = cellData
@@ -332,16 +338,18 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 			}
 
 			timeEntries = append(timeEntries, domain.TimeEntry{
-				Id:        entryId,
-				Minutes:   entryTime,
-				Date:      entryDate,
-				Note:      entryNotes,
-				Billable:  isEntryBillable,
-				UserId:    domain.CurrentUser,
-				ProjectId: projectId,
-				ServiceId: serviceId,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				Id:          entryId,
+				Minutes:     entryTime,
+				Date:        entryDate,
+				Note:        entryNotes,
+				Billable:    isEntryBillable,
+				UserId:      domain.CurrentUser,
+				ProjectId:   projectId,
+				ServiceId:   serviceId,
+				ProjectName: projectName,
+				ServiceName: serviceName,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
 			})
 		}
 
@@ -349,32 +357,27 @@ func (xlx *XlFile) ReadAllEntriesBySheet(sheetName string) []domain.TimeEntry {
 	return timeEntries
 }
 
-func (xlx *XlFile) saveServiceId(serviceIdMap map[string]domain.ServiceId) error {
+func (xlx *XlFile) saveServiceId(serviceIdMap *orderedmap.OrderedMap) error {
 
 	log.Debug("Writing ServiceIds...")
 
-	sheetName := "ServiceIds"
+	sheetName := "Services"
 	xlx.file.NewSheet(sheetName)
-	err := xlx.file.SetSheetVisible(sheetName, false)
-
-	if err != nil {
-		return err
-	}
 	row := 1
-	xlx.WriteHeader(sheetName, row, []string{"serviceId", "serviceName"})
+	xlx.WriteHeader(sheetName, row, []string{"Service Name", "serviceId"})
 	row++
-	for name, id := range serviceIdMap {
-		xlx.writeCellData(sheetName, fmt.Sprintf("A%d", row), name)
-		xlx.writeCellData(sheetName, fmt.Sprintf("B%d", row), id.String())
+	for _, name := range serviceIdMap.Keys() {
+		xlx.writeCellData(sheetName, fmt.Sprintf("A%d", row), name.(string))
+		xlx.writeCellData(sheetName, fmt.Sprintf("B%d", row), serviceIdMap.GetOrDefault(name, "").(domain.ServiceId).String())
 		row++
 	}
-
-	return nil
+	err := xlx.file.SetColVisible(sheetName, "B", false)
+	return err
 }
 
 func (xlx *XlFile) readServiceId() map[string]domain.ServiceId {
 	log.Debug("Reading ServiceIds...")
-	sheetName := "ServiceIds"
+	sheetName := "Services"
 	serviceIdMap := make(map[string]domain.ServiceId)
 
 	rows, err := xlx.file.GetRows(sheetName)
@@ -418,30 +421,25 @@ func (xlx *XlFile) readServiceId() map[string]domain.ServiceId {
 	return serviceIdMap
 }
 
-func (xlx *XlFile) saveProjectId(projectIdMap map[string]domain.ProjectId) error {
-	log.Debug("Writing ProjecId...")
+func (xlx *XlFile) saveProjectId(projectIdMap *orderedmap.OrderedMap) error {
+	log.Debug("Writing ProjectId...")
 
-	sheetName := "ProjectIds"
+	sheetName := "Projects"
 	xlx.file.NewSheet(sheetName)
-	err := xlx.file.SetSheetVisible(sheetName, false)
-
-	if err != nil {
-		return err
-	}
 	row := 1
-	xlx.WriteHeader(sheetName, row, []string{"projectId", "projectName"})
+	xlx.WriteHeader(sheetName, row, []string{"Project Name", "projectId"})
 	row++
-	for name, id := range projectIdMap {
-		xlx.writeCellData(sheetName, fmt.Sprintf("A%d", row), name)
-		xlx.writeCellData(sheetName, fmt.Sprintf("B%d", row), id.String())
+	for _, name := range projectIdMap.Keys() {
+		xlx.writeCellData(sheetName, fmt.Sprintf("A%d", row), name.(string))
+		xlx.writeCellData(sheetName, fmt.Sprintf("B%d", row), projectIdMap.GetOrDefault(name, "").(domain.ProjectId).String())
 		row++
 	}
-
-	return nil
+	err := xlx.file.SetColVisible(sheetName, "B", false)
+	return err
 }
 func (xlx *XlFile) readProjectId() map[string]domain.ProjectId {
 	log.Debug("Reading ProjectIds...")
-	sheetName := "ProjectIds"
+	sheetName := "Projects"
 	projectIdMap := make(map[string]domain.ProjectId)
 
 	rows, err := xlx.file.GetRows(sheetName)
@@ -500,7 +498,7 @@ func (xlx *XlFile) SaveAllEntries(entries []*domain.TimeEntry) error {
 	return xlx.SaveToDisk()
 }
 
-func (xlx *XlFile) SaveServiceProjects(sMap map[string]domain.ServiceId, pMap map[string]domain.ProjectId) {
+func (xlx *XlFile) SaveServiceProjects(sMap *orderedmap.OrderedMap, pMap *orderedmap.OrderedMap) {
 	err := xlx.saveServiceId(sMap)
 	if err != nil {
 		log.Fatal(err)
