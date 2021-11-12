@@ -13,7 +13,7 @@ require (
 	github.com/xuri/excelize/v2 v2.4.1
 )
 
-replace github.com/leanovate/mite-go v0.4.0 => github.com/foryouandyourcustomers/mite-go v0.4.1-0.20211103093825-914729ec2518
+replace github.com/leanovate/mite-go v0.4.0 => github.com/foryouandyourcustomers/mite-go v0.4.1
 
 require (
 	github.com/fsnotify/fsnotify v1.5.1 // indirect

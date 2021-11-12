@@ -72,8 +72,6 @@ github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3Ee
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
 github.com/coreos/go-systemd/v22 v22.3.2/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
 github.com/cpuguy83/go-md2man/v2 v2.0.0/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
-github.com/dannav/hhmmss v1.0.0 h1:/FjTOHXSEOuQIWwPs4abUS6s42ndAGhnVo17VbGnCMA=
-github.com/dannav/hhmmss v1.0.0/go.mod h1:LXyJMlU/lUpkUB4Mj5xQr3Ad1YQb7jBLajgzuKqpaV0=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -89,8 +87,8 @@ github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0/go.m
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fatih/color v1.9.0/go.mod h1:eQcE1qtQxscV5RaZvpXrrb8Drkc3/DdQ+uUYCNjL+zU=
-github.com/foryouandyourcustomers/mite-go v0.4.1-0.20211103093825-914729ec2518 h1:fvYkL0jr9fRjrflcFiH5ZqVqSHUyFCPkmVWTtDiC7pY=
-github.com/foryouandyourcustomers/mite-go v0.4.1-0.20211103093825-914729ec2518/go.mod h1:gaaHUnfFvCeiSbrXF32ZFtKrqKwYG0hc/Yn/AWqEynI=
+github.com/foryouandyourcustomers/mite-go v0.4.1 h1:eTq6aTuRvDMyqhiH4V70bU2iR1ceI8CtAoA/i4pTxqU=
+github.com/foryouandyourcustomers/mite-go v0.4.1/go.mod h1:gaaHUnfFvCeiSbrXF32ZFtKrqKwYG0hc/Yn/AWqEynI=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
 github.com/fsnotify/fsnotify v1.5.1 h1:mZcQUHVQUQWoPXXtuf9yuEXKudkV2sx1E06UadKWpgI=
